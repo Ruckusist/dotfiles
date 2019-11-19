@@ -1,4 +1,4 @@
-import os, shutil
+import os, shutil, filecmp
 from pip._internal import main as pipmain
 
 USERHOME = os.path.expanduser("~")
@@ -13,6 +13,7 @@ def clone_repo(repo): return
 
 def setup_bash():
     global USERHOME
+    print(f"Setting up bash files in {USERHOME}")
     bashfiles = [
         '.bashrc', '.bash_profile', '.bash_aliases'
     ]
@@ -20,8 +21,16 @@ def setup_bash():
         # first take the old files and put them in the backup folder
         # I guess im going to overwrite an older backed up file at this point.
         if os.path.exists(os.path.join(USERHOME, x)):
-            shutil.move(os.path.join(USERHOME, x), os.path.join(USERHOME,'.files', 'backup', f"{x}.old"))
-        shutil.move(os.path.join(USERHOME, '.files', '.files', x), os.path.join(USERHOME, x))
+            if not filecmp(
+                os.path.join(USERHOME, x),
+                os.path.join(USERHOME, '.files', 'bash', x)
+            ):
+                shutil.move(os.path.join(USERHOME, x), os.path.join(USERHOME,'.files', 'backup', f"{x}.old"))
+                print(f"[backup] --> ~/.files/backup/{x}.old")
+                shutil.move(os.path.join(USERHOME, '.files', 'bash', x), os.path.join(USERHOME, x))
+                print(f"[update] <-- ~/.files/{x}")
+            else:
+                print(f"[allgood] No Changes to file: {x}")
 
 
 def install_via_pip(repo): pipmain(['install', '-U', repo])
@@ -72,5 +81,5 @@ def get_powerline():
     print("Make sure to add POWERLINE to the PS1 in your .bashrc")
     return True
 
-if get_powerline():
-    setup_bash()
+# get_powerline()
+setup_bash()
