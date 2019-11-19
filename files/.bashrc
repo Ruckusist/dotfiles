@@ -10,9 +10,9 @@ HISTSIZE=1000           # ??
 HISTFILESIZE=2000       # ??
 
 # SHELL OPTIONS
-shopt -s checkwinsize  # Check size on every refresh
-shopt -s globstar      # Use ** for 'grab-all'
-shopt -s histappend    # append to history file - not overwrite
+shopt -s checkwinsize   # Check size on every refresh
+shopt -s globstar       # Use ** for 'grab-all'
+shopt -s histappend     # append to history file - not overwrite
 
 # THIS SAYS PROGRAMABLE COMPLETION
 if ! shopt -oq posix; then
@@ -32,4 +32,4 @@ fi
 powerline-daemon -q
 POWERLINE_BASH_CONTINUATION=1
 POWERLINE_BASH_SELECT=1
-source "/home/dad/.local/lib/python3.7/site-packages/powerline/bindings/bash/powerline.sh"
+. /usr/share/powerline/bindings/bash/powerline.sh

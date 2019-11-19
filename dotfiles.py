@@ -3,35 +3,34 @@ from pip._internal import main as pipmain
 
 USERHOME = os.path.expanduser("~")
 
-print("Getting the Dotfiles right.")
-
-def backup_old_file(old_file): return
-
-def copy_file_to(file, dest): return
-
-def clone_repo(repo): return
-
-def setup_bash():
+def setup_bash(verbose=False):
+    """am i making this harder than it needs to be...
+    id bet I could do a blah blah for file in bashfiles... 
+    maybe its fine.
+    """
     global USERHOME
-    print(f"Setting up bash files in {USERHOME}")
     bashfiles = [
-        '.bashrc', '.bash_profile', '.bash_aliases'
+        '.bashrc', '.bash_profile', '.bash_aliases', '.bash_logout', '.bash_history'
     ]
     for x in bashfiles:
-        # first take the old files and put them in the backup folder
-        # I guess im going to overwrite an older backed up file at this point.
-        if os.path.exists(os.path.join(USERHOME, x)):
-            if not filecmp(
-                os.path.join(USERHOME, x),
-                os.path.join(USERHOME, '.files', 'bash', x)
-            ):
-                shutil.move(os.path.join(USERHOME, x), os.path.join(USERHOME,'.files', 'backup', f"{x}.old"))
-                print(f"[backup] --> ~/.files/backup/{x}.old")
-                shutil.move(os.path.join(USERHOME, '.files', 'bash', x), os.path.join(USERHOME, x))
-                print(f"[update] <-- ~/.files/{x}")
+        OLD_FILE = os.path.join(USERHOME, x)
+        BACKUP_FILE = os.path.join(USERHOME,'.files', 'backup', f"{x}.old")
+        NEW_FILE = os.path.join(USERHOME, '.files', 'files', x)
+        if verbose: print(f"!--> checking on file {OLD_FILE}")
+        if os.path.exists(OLD_FILE):
+            if not filecmp.cmp(OLD_FILE, NEW_FILE):
+                shutil.move(OLD_FILE, BACKUP_FILE)
+                if verbose: print(f"[backup] --> {BACKUP_FILE}")
+                shutil.move(NEW_FILE, OLD_FILE)
+                if verbose: print(f"[update] <-- {NEW_FILE}")
             else:
-                print(f"[allgood] No Changes to file: {x}")
+                if verbose: print(f"[allgood] No Changes to file: {x}")
+        else:
+            if verbose: print(f"[error] {x} does not exist")
+            shutil.move(NEW_FILE, OLD_FILE)
+            if verbose: print(f"[update] <-- {NEW_FILE}")
 
+def install_via_cargo(repo): os.system(f'cargo install {repo}')
 
 def install_via_pip(repo): pipmain(['install', '-U', repo])
 
@@ -81,5 +80,47 @@ def get_powerline():
     print("Make sure to add POWERLINE to the PS1 in your .bashrc")
     return True
 
-# get_powerline()
-setup_bash()
+def setup_powerline():
+    install_via_apt('powerline')  # GEEZ
+
+def setup_exa():
+    install_via_apt('cargo')
+    install_via_cargo('exa')
+
+def source_profile(): 
+    global USERHOME
+    os.system(f". {os.path.join(USERHOME,'.bash_profile')}")
+
+def transfer_file(NEW_FILE, BACKUP_FILE, OLD_FILE, verbose=True):
+    if os.path.exists(OLD_FILE):
+        if not filecmp.cmp(OLD_FILE, NEW_FILE):
+            shutil.move(OLD_FILE, BACKUP_FILE)
+            if verbose: print(f"[backup] --> {BACKUP_FILE}")
+            shutil.move(NEW_FILE, OLD_FILE)
+            if verbose: print(f"[update] <-- {NEW_FILE}")
+        else:
+            if verbose: print(f"[allgood] No Changes to file: {OLD_FILE}")
+    else:
+        if verbose: print(f"[error] {OLD_FILE} does not exist, not backing up.")
+        shutil.move(NEW_FILE, OLD_FILE)
+        if verbose: print(f"[new] <-- {NEW_FILE}")
+    
+
+def setup_tmux():
+    global USERHOME
+    print("working on tmux")
+    OLD_FILE = os.path.join(USERHOME, '.tmux.conf')
+    BACKUP_FILE = os.path.join(USERHOME, '.files', 'backup', '.tmux.conf')
+    NEW_FILE = os.path.join(USERHOME, '.files', 'files', '.tmux.conf')
+    transfer_file(NEW_FILE, BACKUP_FILE, OLD_FILE)
+
+if __name__ == "__main__":
+    print("Starting Dotfile Update")
+    try:
+        # setup_exa()
+        # setup_powerline()
+        # setup_bash()
+        setup_tmux()
+    finally:
+        source_profile()
+    print("finished update.")
