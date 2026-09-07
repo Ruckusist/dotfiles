@@ -1,0 +1,24 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary and backup files
+*~
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# OS / Editor artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local logs and caches
+*.log
+
+# Sensitive credentials and secrets
+*secrets*.json
+*.secret
