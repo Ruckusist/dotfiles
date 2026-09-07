@@ -346,6 +346,14 @@ reload_environment() {
         picom --config "${HOME}/.config/picom/picom.conf" -b >/dev/null 2>&1 &
         log_success "Picom restarted"
     fi
+
+    # 5. Ultrawide layout daemon
+    if pgrep -f "i3-single-center.py" >/dev/null 2>&1; then
+        pkill -f "i3-single-center.py" || true
+        sleep 0.2
+    fi
+    nohup "${HOME}/.local/bin/i3-single-center.py" >/dev/null 2>&1 &
+    log_success "Centered Master layout daemon restarted"
 }
 
 # Main execution flow

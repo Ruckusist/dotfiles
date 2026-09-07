@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 """
-i3-single-center.py
-Dynamically centers single-window workspaces on ultrawide displays in i3wm.
+i3-single-center.py (Centered-Master Layout Manager)
+Dynamically manages a Centered Master 3-column tiling layout on ultrawide displays in i3wm.
 
-- 1 tiled window (or empty workspace): sets horizontal outer gaps so the window
-  is exactly 50% width, centered directly under Polybar.
-- 2+ tiled windows: resets horizontal outer gaps to default (2px) so windows
-  tile across the full width of the screen using standard i3 logic.
-- Maintains top gap (46px) so Polybar is never covered.
+Layout Progression:
+- 1 Window: Centered Master occupying 50% width directly under Polybar (left/right outer gaps = 848px).
+- 2 Windows: Master remains fixed at 50% width centered; new window tiles on the Left (25% width).
+  Asymmetric gaps: left = 2px, right = 848px.
+- 3 Windows: Master remains fixed at 50% width centered; 3rd window tiles on the Right (25% width).
+  Symmetric gaps: left = 2px, right = 2px.
+- 4+ Windows: Windows stack vertically in the Left and Right columns alternating around the fixed
+  50% Center Master.
+- Window Closing: Layout seamlessly shrinks back down (5 -> 4 -> 3 -> 2 -> 1). If the Master window
+  closes, the surviving active tile is promoted to Master.
+- Keybinding: Supports '--promote' flag to swap the currently focused window into the Center Master.
 """
 
 import os
@@ -118,15 +124,6 @@ class I3IPC:
         except Exception:
             pass
 
-def count_tiled_windows(node):
-    if node.get("window"):
-        return 1
-    count = 0
-    # Search tiled children (nodes), ignoring floating_nodes
-    for child in node.get("nodes", []):
-        count += count_tiled_windows(child)
-    return count
-
 def find_focused_workspace(tree):
     def search(node, current_ws=None):
         if node.get("type") == "workspace":
@@ -153,38 +150,201 @@ def find_workspace_output(tree, ws_name):
         return None
     return search(tree)
 
-def update_current_workspace_gaps(ipc):
-    tree = ipc.send_cmd(4) # GET_TREE
-    if not tree:
-        return
+def get_tiled_windows(node):
+    res = []
+    if node.get("window"):
+        res.append(node)
+    for child in node.get("nodes", []):
+        res.extend(get_tiled_windows(child))
+    return res
 
-    ws = find_focused_workspace(tree)
-    if not ws:
-        return
+class CenteredMasterManager:
+    def __init__(self, ipc):
+        self.ipc = ipc
+        # ws_name -> {"master_id": int, "left_ids": [int], "right_ids": [int]}
+        self.states = {}
+        self.is_updating = False
 
-    ws_name = ws.get("name")
-    if ws_name == "__i3_scratch":
-        return
+    def update_workspace(self, ws, output_width=3440):
+        if not ws or self.is_updating:
+            return
+        ws_name = ws.get("name")
+        if ws_name == "__i3_scratch":
+            return
 
-    tiled_count = count_tiled_windows(ws)
+        tiled_wins = get_tiled_windows(ws)
+        total_wins = len(tiled_wins)
+        tiled_win_ids = set(w["id"] for w in tiled_wins)
 
-    output_node = find_workspace_output(tree, ws_name)
-    output_width = 3440
-    if output_node and "rect" in output_node:
-        output_width = output_node["rect"]["width"]
+        # Single window gap (for 50% width centered)
+        single_gap = int((output_width * 0.25) - INNER_GAP)
 
-    # Target 50% width centered
-    single_gap = int((output_width * 0.25) - INNER_GAP)
-    target_gap = single_gap if tiled_count <= 1 else DEFAULT_OUTER_GAP
+        if total_wins == 0:
+            self.states.pop(ws_name, None)
+            self._set_gaps(ws, single_gap, single_gap)
+            return
 
-    current_gaps = ws.get("gaps", {})
-    current_outer_h = current_gaps.get("right", 0) + DEFAULT_OUTER_GAP
+        if total_wins == 1:
+            win_id = tiled_wins[0]["id"]
+            self.states[ws_name] = {
+                "master_id": win_id,
+                "left_ids": [],
+                "right_ids": []
+            }
+            self._set_gaps(ws, single_gap, single_gap)
+            return
 
-    if abs(current_outer_h - target_gap) > 5:
-        ipc.send_cmd(0, f"gaps horizontal current set {target_gap}; gaps top current set {TOP_GAP}")
+        self.is_updating = True
+        try:
+            state = self.states.get(ws_name, {"master_id": None, "left_ids": [], "right_ids": []})
+            master_id = state.get("master_id")
+
+            # If master died or not set, pick the oldest or currently focused window
+            if master_id not in tiled_win_ids:
+                prior_candidates = state.get("left_ids", []) + state.get("right_ids", [])
+                promoted = None
+                for cid in prior_candidates:
+                    if cid in tiled_win_ids:
+                        promoted = cid
+                        break
+                if promoted:
+                    master_id = promoted
+                else:
+                    master_id = tiled_wins[0]["id"]
+                state["master_id"] = master_id
+                state["left_ids"] = []
+                state["right_ids"] = []
+
+            # Filter out dead windows
+            left_ids = [cid for cid in state.get("left_ids", []) if cid in tiled_win_ids and cid != master_id]
+            right_ids = [cid for cid in state.get("right_ids", []) if cid in tiled_win_ids and cid != master_id]
+
+            known_ids = set([master_id] + left_ids + right_ids)
+            new_ids = [w["id"] for w in tiled_wins if w["id"] not in known_ids]
+
+            # Allocate new windows:
+            # First new window -> Left column
+            # Second new window -> Right column
+            # Third new window -> Left column stack
+            # Fourth new window -> Right column stack
+            for nid in new_ids:
+                if len(left_ids) == 0:
+                    left_ids.append(nid)
+                elif len(right_ids) < len(left_ids):
+                    right_ids.append(nid)
+                else:
+                    left_ids.append(nid)
+
+            state["left_ids"] = left_ids
+            state["right_ids"] = right_ids
+            self.states[ws_name] = state
+
+            # Apply layout & gaps
+            if len(right_ids) == 0 and len(left_ids) == 1:
+                # 2 Windows: Left (25%) + Center Master (50%) + Empty Right Margin (25%)
+                self._set_gaps(ws, DEFAULT_OUTER_GAP, single_gap)
+                self._arrange_two_windows(ws, left_ids[0], master_id)
+            else:
+                # 3+ Windows: Left (25%) + Center Master (50%) + Right (25%)
+                self._set_gaps(ws, DEFAULT_OUTER_GAP, DEFAULT_OUTER_GAP)
+                self._arrange_multi_windows(ws, left_ids, master_id, right_ids)
+        finally:
+            self.is_updating = False
+
+    def promote_focused(self, ws):
+        if not ws:
+            return
+        ws_name = ws.get("name")
+        state = self.states.get(ws_name)
+        if not state:
+            return
+
+        current_master = state.get("master_id")
+        tiled_wins = get_tiled_windows(ws)
+        focused_win = None
+        for w in tiled_wins:
+            if w.get("focused"):
+                focused_win = w
+                break
+
+        if not focused_win or focused_win["id"] == current_master:
+            return
+
+        new_master_id = focused_win["id"]
+
+        # Swap in i3 tree
+        self.ipc.send_cmd(0, f"[con_id={new_master_id}] swap container with con_id {current_master}")
+
+        # Swap in state
+        left_ids = state.get("left_ids", [])
+        right_ids = state.get("right_ids", [])
+
+        if new_master_id in left_ids:
+            idx = left_ids.index(new_master_id)
+            left_ids[idx] = current_master
+        elif new_master_id in right_ids:
+            idx = right_ids.index(new_master_id)
+            right_ids[idx] = current_master
+
+        state["master_id"] = new_master_id
+        state["left_ids"] = left_ids
+        state["right_ids"] = right_ids
+        self.states[ws_name] = state
+
+        # Re-apply layout
+        tree = self.ipc.send_cmd(4)
+        updated_ws = find_focused_workspace(tree)
+        if updated_ws:
+            self.update_workspace(updated_ws)
+
+    def _set_gaps(self, ws, left_gap, right_gap):
+        current_gaps = ws.get("gaps", {})
+        c_left = current_gaps.get("left", 0) + DEFAULT_OUTER_GAP
+        c_right = current_gaps.get("right", 0) + DEFAULT_OUTER_GAP
+
+        if abs(c_left - left_gap) > 5 or abs(c_right - right_gap) > 5:
+            self.ipc.send_cmd(0, f"gaps left current set {left_gap}; gaps right current set {right_gap}; gaps top current set {TOP_GAP}; gaps bottom current set {DEFAULT_OUTER_GAP}")
+
+    def _arrange_two_windows(self, ws, left_id, master_id):
+        cmds = []
+        cmds.append(f"[con_id={master_id}] layout splith")
+        cmds.append(f"[con_id={left_id}] move left; [con_id={left_id}] move left")
+        cmds.append(f"[con_id={master_id}] resize set width 67 ppt")
+        cmds.append(f"[con_id={left_id}] resize set width 33 ppt")
+        self.ipc.send_cmd(0, "; ".join(cmds))
+
+    def _arrange_multi_windows(self, ws, left_ids, master_id, right_ids):
+        cmds = []
+        cmds.append(f"[con_id={master_id}] layout splith")
+
+        # 1. Left column
+        if left_ids:
+            first_left = left_ids[0]
+            cmds.append(f"[con_id={first_left}] move left; [con_id={first_left}] move left; [con_id={first_left}] move left")
+            if len(left_ids) > 1:
+                cmds.append(f"[con_id={first_left}] split vertical; [con_id={first_left}] mark --add _l_stack")
+                for other_lid in left_ids[1:]:
+                    cmds.append(f"[con_id={other_lid}] move container to mark _l_stack")
+
+        # 2. Right column
+        if right_ids:
+            first_right = right_ids[0]
+            cmds.append(f"[con_id={first_right}] move right; [con_id={first_right}] move right; [con_id={first_right}] move right")
+            if len(right_ids) > 1:
+                cmds.append(f"[con_id={first_right}] split vertical; [con_id={first_right}] mark --add _r_stack")
+                for other_rid in right_ids[1:]:
+                    cmds.append(f"[con_id={other_rid}] move container to mark _r_stack")
+
+        # Set widths: master 50 ppt, left 25 ppt, right 25 ppt
+        cmds.append(f"[con_id={master_id}] resize set width 50 ppt")
+        if left_ids:
+            cmds.append(f"[con_id={left_ids[0]}] resize set width 25 ppt")
+        if right_ids:
+            cmds.append(f"[con_id={right_ids[0]}] resize set width 25 ppt")
+
+        self.ipc.send_cmd(0, "; ".join(cmds))
 
 def acquire_lock():
-    # If another instance exists, terminate it to take over
     if os.path.exists(LOCK_FILE):
         try:
             with open(LOCK_FILE, "r") as f:
@@ -209,6 +369,20 @@ def acquire_lock():
         sys.exit(0)
 
 def main():
+    sock_path = get_socket_path()
+
+    # If invoked with --promote, perform quick swap and exit
+    if len(sys.argv) > 1 and sys.argv[1] == "--promote":
+        ipc = I3IPC(sock_path)
+        tree = ipc.send_cmd(4)
+        ws = find_focused_workspace(tree)
+        if ws:
+            mgr = CenteredMasterManager(ipc)
+            mgr.update_workspace(ws)
+            mgr.promote_focused(ws)
+        ipc.close()
+        sys.exit(0)
+
     lock_file = acquire_lock()
 
     running = True
@@ -220,13 +394,18 @@ def main():
 
     while running:
         try:
-            sock_path = get_socket_path()
             ipc = I3IPC(sock_path)
             if not ipc.subscribe(["workspace", "window"]):
                 time.sleep(1)
                 continue
 
-            update_current_workspace_gaps(ipc)
+            mgr = CenteredMasterManager(ipc)
+            tree = ipc.send_cmd(4)
+            ws = find_focused_workspace(tree)
+            if ws:
+                output_node = find_workspace_output(tree, ws.get("name"))
+                width = output_node["rect"]["width"] if output_node and "rect" in output_node else 3440
+                mgr.update_workspace(ws, output_width=width)
 
             while running:
                 r, _, _ = select.select([ipc.ev_sock], [], [], 0.5)
@@ -235,19 +414,23 @@ def main():
 
                 ev_type, ev_data = ipc.recv_event()
                 if ev_data is None:
-                    # Broken connection (i3 reload/restart)
                     break
 
-                # Drain burst events within 20ms
+                # Drain burst events within 30ms
                 while True:
-                    r_drain, _, _ = select.select([ipc.ev_sock], [], [], 0.02)
+                    r_drain, _, _ = select.select([ipc.ev_sock], [], [], 0.03)
                     if not r_drain:
                         break
                     _, extra = ipc.recv_event()
                     if extra is None:
                         break
 
-                update_current_workspace_gaps(ipc)
+                tree = ipc.send_cmd(4)
+                ws = find_focused_workspace(tree)
+                if ws:
+                    output_node = find_workspace_output(tree, ws.get("name"))
+                    width = output_node["rect"]["width"] if output_node and "rect" in output_node else 3440
+                    mgr.update_workspace(ws, output_width=width)
 
             ipc.close()
         except (ConnectionResetError, BrokenPipeError, FileNotFoundError):

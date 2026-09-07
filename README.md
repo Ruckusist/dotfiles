@@ -12,9 +12,7 @@ Key components:
 - **Window Manager**: [i3wm](https://i3wm.org/) with gaps, custom layouts, and keybindings.
 - **Status Bar**: [Polybar](https://polybar.github.io/) styled with rounded corners, custom modules (Antigravity quota, MPRIS media control, Bluetooth, Torrents, WiFi, hardware monitors).
 - **Compositor**: [Picom](https://github.com/yshui/picom) with GLX backend, dual-kawase background blur, soft drop shadows, and rounded corners (8px).
-- **Notifications**: [Dunst](https://dunst-project.org/) with left-click default action activation.
-- **Ultrawide Window Centering**: Custom daemon (`i3-single-center.py`) using i3 IPC sockets to automatically center single windows at 50% screen width directly under Polybar on ultrawide monitors.
-- **Wallpaper Rotator**: `wallpaper_rotator.py` + `feh` for random wallpaper cycling from `~/wall`.
+- **Ultrawide Centered Master Layout**: Custom daemon (`i3-single-center.py`) using i3 IPC sockets to maintain a fixed 50% width centered pane under Polybar, dynamically growing and stacking side tiles around it (Left 25% first, Right 25% second, then vertical stacking). Also provides `$mod+m` to promote any tile to Center Master.
 - **Multiplexer**: `tmux` configured with the matching Nord color scheme and Powerline status line.
 
 ---
@@ -110,10 +108,14 @@ Reload i3wm, Polybar, Picom, and Dunst in-place:
   - Left-click: Pops up a desktop notification with remaining 5h and weekly quota.
   - Right-click: Forces quota cache refresh.
 
-### Ultrawide Auto-Centering (`bin/i3-single-center.py`)
+### Ultrawide Centered Master Layout (`bin/i3-single-center.py`)
 - Continuously listens on the i3 IPC UNIX socket for `workspace` and `window` events.
-- If a workspace contains **1 tiled window**, it calculates dynamic horizontal outer gaps such that the window occupies exactly 50% width directly centered under Polybar.
-- If **2 or more windows** are opened, outer gaps revert to default (2px) for normal side-by-side tiling.
+- **1 Tiled Window**: Centered under Polybar at 50% screen width ($x = 860$, width = $1720\text{px}$).
+- **2 Tiled Windows**: The Center Master remains 100% untouched; the second window opens on the **Left** at 25% width ($860\text{px}$), with asymmetric gaps keeping the right margin empty.
+- **3 Tiled Windows**: Center Master remains untouched; the third window opens on the **Right** at 25% width ($860\text{px}$).
+- **4+ Tiled Windows**: Additional windows stack vertically in the Left and Right columns alternating around the fixed 50% Center Master.
+- **Closing Windows**: Columns smoothly step backward down the progression as windows close. If the Master window closes, the active side tile promotes to Master.
+- **Promote Shortcut**: Press `Mod4 + m` to instantly swap the currently focused window into the Center Master position.
 
 ### Wallpaper Rotator (`bin/wallpaper_rotator.py`)
 - Picks a random image from `~/wall/`.
