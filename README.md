@@ -15,7 +15,7 @@ Key components:
   - **Main Bar (Center Master)**: 50% width centered pill ($x = 860..2580$) with workspaces, active window title, MPRIS media control, wallpaper switcher, Antigravity quota meter, volume, and clock.
   - **System HUD (Right Flank)**: 20% width floating pill ($x = 2666..3354$, 77.5% offset) hosting Bluetooth, WiFi, Disk space, RAM, and CPU telemetry with Nerd Font iconography.
   - **Dock Manager GUI**: GTK3 Nord-themed manager (`apps_settings.py` / `$mod+Shift+d`) to add, edit, remove, and reorder dock apps with live reload.
-  - **Theme System**: Modular themes in `config/polybar/themes/` switchable via `~/.config/polybar/set-theme.sh` with live hot-reloading.
+  - **Modular Theme System**: Centralized color definitions in `config/polybar/themes/` switchable via `~/.config/polybar/set-theme.sh` with live hot-reloading.
 - **Compositor**: [Picom](https://github.com/yshui/picom) with GLX backend, dual-kawase background blur (enabled on semi-transparent dock pills), soft drop shadows, and rounded corners (8px).
 - **Ultrawide Centered Master Layout**: Custom daemon (`i3-single-center.py`) using i3 IPC sockets to maintain a fixed 50% width centered pane under Polybar, dynamically growing and stacking side tiles around it (Left 25% first, Right 25% second, then vertical stacking). Also provides `$mod+m` to promote any tile to Center Master.
 - **Multiplexer**: `tmux` configured with the matching Nord color scheme and Powerline status line.
@@ -41,7 +41,7 @@ dotfiles/
 │       ├── config.ini                 # Tri-bar Polybar configuration (apps, main, right)
 │       ├── current_theme.ini          # Active theme symlink (default: themes/default.ini)
 │       ├── themes/                    # Modular color palettes
-│       │   ├── default.ini            # Semi-transparent Nord theme
+│       │   ├── default.ini            # Semi-transparent frosted Nord theme
 │       │   ├── dracula.ini            # Dracula palette
 │       │   └── catppuccin-mocha.ini   # Catppuccin Mocha palette
 │       ├── set-theme.sh               # CLI theme switcher tool with live reload
@@ -81,18 +81,48 @@ dotfiles/
 ./install.sh --reload
 ```
 
-### Switching Polybar Color Themes
+---
+
+## 🎨 Polybar Theming & Visual Customization
+
+### Switching Color Themes
+Polybar uses an `include-file = current_theme.ini` architecture pointing to palette files in `config/polybar/themes/`.
+
 ```bash
-# List available themes
+# List available color palettes
 ~/.config/polybar/set-theme.sh --list
 
-# Switch to Dracula or Catppuccin Mocha with live reload
+# Switch to Dracula or Catppuccin Mocha with instant live reload
 ~/.config/polybar/set-theme.sh dracula
 ~/.config/polybar/set-theme.sh catppuccin-mocha
 
-# Return to default
+# Return to default (Semi-transparent frosted Nord)
 ~/.config/polybar/set-theme.sh default
 ```
+
+### Creating a New Theme
+1. Add a new `.ini` file in `~/.config/polybar/themes/<theme-name>.ini`:
+   ```ini
+   [colors]
+   ; Use 8-digit ARGB (#AARRGGBB) for transparency (e.g. #99 = 60% opacity)
+   background = #991e1e2e
+   background-alt = #cc313244
+   foreground = #cdd6f4
+   foreground-alt = #bac2de
+   primary = #89b4fa
+   secondary = #89dceb
+   accent = #cba6f7
+   success = #a6e3a1
+   warning = #f9e2af
+   alert = #f38ba8
+   disabled = #6c7086
+   ```
+2. Activate it anytime with `~/.config/polybar/set-theme.sh <theme-name>`.
+
+### Glassmorphic Blur & Transparency
+All three floating Polybar pills take advantage of Picom's `dual_kawase` hardware-accelerated compositor blur:
+* **Background Opacity**: Set via `#99...` in `themes/default.ini` (60% alpha).
+* **Blur Configuration**: Managed in `config/picom/picom.conf` (`blur-method = "dual_kawase"`, `blur-strength = 7`). Dock windows are exempt from shadow borders and blur exclusion, producing a clean frosted glass aesthetic directly over the wallpaper.
 
 ---
 
@@ -101,20 +131,20 @@ dotfiles/
 ### Apps Dock (`bar/apps`)
 - Located on the left flank at $x = 86\text{px}$ ($2.5\%$ screen offset).
 - Renders clickable application icons defined in `config/polybar/apps.json`.
-- Right-click anywhere on the dock or click the settings gear (󰒓) to launch the GTK3 Apps Manager.
+- Right-click anywhere on the dock or click the settings gear (󰒓) to launch the GTK3 Apps Manager (`$mod+Shift+d`).
 
 ### Main Bar (`bar/main`)
-- Centered directly over the Center Master window ($50\%$ screen width).
-- Workspaces, active window title, MPRIS controls, wallpaper rotator, Antigravity quota meter, volume, and clock.
+- Centered directly over the Center Master window ($50\%$ screen width, $x = 860..2580$).
+- Displays workspaces, active window title, MPRIS controls, wallpaper rotator, Antigravity quota meter, volume, and clock.
 
 ### System HUD (`bar/right`)
 - Symmetrically balances the left apps dock on the right flank at $x = 2666\text{px}$ ($77.5\%$ screen offset, $20\%$ width).
-- Monitors hardware and connectivity with clean Nerd Font icons:
-  - 󰂱 / 󰂯 Bluetooth status (click opens Blueman, right-click toggles power)
-  - 󰖩 WiFi network SSID
-  - 󰋊 Root filesystem usage percentage
-  - 󰍛 Memory / RAM usage percentage
-  - 󰻠 CPU load percentage
+- Displays hardware vitals and connectivity using high-contrast Nerd Font icons:
+  - 󰂱 / 󰂯 **Bluetooth**: Shows live connected device (e.g., `󰂱 DOUK AUDIO`), left-click opens Blueman, right-click toggles controller power.
+  - 󰖩 **WiFi**: Active network SSID and link state (`󰖪 off` when disconnected).
+  - 󰋊 **Disk Space**: Percentage utilized on the root (`/`) filesystem.
+  - 󰍛 **RAM / Memory**: Dynamic percentage of physical memory consumed.
+  - 󰻠 **CPU Load**: Overall multi-core CPU utilization percentage.
 
 ### Ultrawide Centered Master Layout (`bin/i3-single-center.py`)
 - Continuously listens on the i3 IPC UNIX socket for `workspace` and `window` events.
