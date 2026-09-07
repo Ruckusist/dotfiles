@@ -10,7 +10,10 @@ This repository centralizes all configurations, daemons, and helper scripts that
 
 Key components:
 - **Window Manager**: [i3wm](https://i3wm.org/) with gaps, custom layouts, and keybindings.
-- **Status Bar**: [Polybar](https://polybar.github.io/) styled with rounded corners, custom modules (Antigravity quota, MPRIS media control, Bluetooth, Torrents, WiFi, hardware monitors).
+- **Status Bar & Apps Dock**: Dual [Polybar](https://polybar.github.io/) pill architecture:
+  - **Main Bar**: 50% width centered ($x=860..2580$) with workspaces, active window, MPRIS media player, Bluetooth, WiFi, Antigravity quota, and system vitals.
+  - **Apps Dock**: 20% width floating on the left ($x=86..774$, 2.5% buffer) displaying dynamic clickable app icons.
+  - **Dock Manager GUI**: GTK3 Nord-themed manager (`apps_settings.py` / `$mod+Shift+d`) to add, edit, remove, and reorder dock apps with live reload.
 - **Compositor**: [Picom](https://github.com/yshui/picom) with GLX backend, dual-kawase background blur, soft drop shadows, and rounded corners (8px).
 - **Ultrawide Centered Master Layout**: Custom daemon (`i3-single-center.py`) using i3 IPC sockets to maintain a fixed 50% width centered pane under Polybar, dynamically growing and stacking side tiles around it (Left 25% first, Right 25% second, then vertical stacking). Also provides `$mod+m` to promote any tile to Center Master.
 - **Multiplexer**: `tmux` configured with the matching Nord color scheme and Powerline status line.
@@ -33,8 +36,11 @@ dotfiles/
 │   ├── picom/
 │   │   └── picom.conf                 # GLX compositor, blur, shadows, rounded corners
 │   └── polybar/
-│       ├── config.ini                 # Main Polybar configuration and module layout
-│       ├── launch.sh                  # Process supervisor & multi-monitor launcher
+│       ├── config.ini                 # Dual Polybar configuration (main bar + apps dock)
+│       ├── launch.sh                  # Multi-instance supervisor (apps + main)
+│       ├── apps.json                  # Pinned apps configuration
+│       ├── apps_dock.py               # Clickable Nerd Font app launcher module
+│       ├── apps_settings.py           # GTK3 Nord-themed Apps Dock GUI manager
 │       ├── player.sh                  # MPRIS media player controller (playerctl)
 │       ├── bluetooth.sh               # Bluetooth status & quick control
 │       ├── torrent.sh                 # Transmission daemon status & transfer speeds

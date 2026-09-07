@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Alacritty",
+    "icon": "",
+    "cmd": "alacritty &"
+  },
+  {
+    "name": "Firefox",
+    "icon": "󰈹",
+    "cmd": "firefox &"
+  },
+  {
+    "name": "VS Code",
+    "icon": "󰨞",
+    "cmd": "code &"
+  },
+  {
+    "name": "Files (MC)",
+    "icon": "󰉋",
+    "cmd": "alacritty -e mc &"
+  },
+  {
+    "name": "Audio Mixer",
+    "icon": "󰓃",
+    "cmd": "pavucontrol &"
+  },
+  {
+    "name": "System Monitor",
+    "icon": "󰍛",
+    "cmd": "alacritty -e htop &"
+  }
+]
