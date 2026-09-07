@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
-# Polybar bluetooth status: shows off/on/connected-device-name.
+# Polybar bluetooth status: shows off/on/connected-device-name with icons.
 
 if ! command -v bluetoothctl >/dev/null 2>&1; then
-    echo " n/a"
+    echo "󰂲 n/a"
     exit 0
 fi
 
 powered=$(bluetoothctl show | awk '/Powered:/{print $2}')
 if [ "$powered" != "yes" ]; then
-    echo " off"
+    echo "󰂲 off"
     exit 0
 fi
 
 connected=$(bluetoothctl devices Connected)
 if [ -n "$connected" ]; then
     name=$(echo "$connected" | head -n1 | cut -d' ' -f3-)
-    echo " $name"
+    echo "󰂱 $name"
 else
-    echo " on"
+    echo "󰂯 on"
 fi

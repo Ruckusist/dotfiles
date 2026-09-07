@@ -1,32 +1,37 @@
 [
   {
-    "name": "Alacritty",
-    "icon": "",
-    "cmd": "alacritty &"
-  },
-  {
+    "icon": "\udb80\ude39",
     "name": "Firefox",
-    "icon": "󰈹",
     "cmd": "firefox &"
   },
   {
+    "icon": "\uf489",
+    "name": "Alacritty",
+    "cmd": "alacritty &"
+  },
+  {
+    "icon": "\udb82\ude1e",
     "name": "VS Code",
-    "icon": "󰨞",
     "cmd": "code &"
   },
   {
+    "icon": "\udb80\ude4b",
     "name": "Files (MC)",
-    "icon": "󰉋",
     "cmd": "alacritty -e mc &"
   },
   {
+    "icon": "\udb81\udcc3",
     "name": "Audio Mixer",
-    "icon": "󰓃",
     "cmd": "pavucontrol &"
   },
   {
+    "icon": "\udb80\udf5b",
     "name": "System Monitor",
-    "icon": "󰍛",
     "cmd": "alacritty -e htop &"
+  },
+  {
+    "icon": "\uf489",
+    "name": "Google",
+    "cmd": "alacritty -e agy-auto &"
   }
 ]

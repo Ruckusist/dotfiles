@@ -10,11 +10,13 @@ This repository centralizes all configurations, daemons, and helper scripts that
 
 Key components:
 - **Window Manager**: [i3wm](https://i3wm.org/) with gaps, custom layouts, and keybindings.
-- **Status Bar & Apps Dock**: Dual [Polybar](https://polybar.github.io/) pill architecture:
-  - **Main Bar**: 50% width centered ($x=860..2580$) with workspaces, active window, MPRIS media player, Bluetooth, WiFi, Antigravity quota, and system vitals.
-  - **Apps Dock**: 20% width floating on the left ($x=86..774$, 2.5% buffer) displaying dynamic clickable app icons.
+- **Status Bar & Floating Docks**: Tri-[Polybar](https://polybar.github.io/) pill architecture with picom dual-kawase blur:
+  - **Apps Dock (Left Flank)**: 20% width floating pill ($x = 86..774$, 2.5% buffer) displaying dynamic clickable app icons.
+  - **Main Bar (Center Master)**: 50% width centered pill ($x = 860..2580$) with workspaces, active window title, MPRIS media control, wallpaper switcher, Antigravity quota meter, volume, and clock.
+  - **System HUD (Right Flank)**: 20% width floating pill ($x = 2666..3354$, 77.5% offset) hosting Bluetooth, WiFi, Disk space, RAM, and CPU telemetry with Nerd Font iconography.
   - **Dock Manager GUI**: GTK3 Nord-themed manager (`apps_settings.py` / `$mod+Shift+d`) to add, edit, remove, and reorder dock apps with live reload.
-- **Compositor**: [Picom](https://github.com/yshui/picom) with GLX backend, dual-kawase background blur, soft drop shadows, and rounded corners (8px).
+  - **Theme System**: Modular themes in `config/polybar/themes/` switchable via `~/.config/polybar/set-theme.sh` with live hot-reloading.
+- **Compositor**: [Picom](https://github.com/yshui/picom) with GLX backend, dual-kawase background blur (enabled on semi-transparent dock pills), soft drop shadows, and rounded corners (8px).
 - **Ultrawide Centered Master Layout**: Custom daemon (`i3-single-center.py`) using i3 IPC sockets to maintain a fixed 50% width centered pane under Polybar, dynamically growing and stacking side tiles around it (Left 25% first, Right 25% second, then vertical stacking). Also provides `$mod+m` to promote any tile to Center Master.
 - **Multiplexer**: `tmux` configured with the matching Nord color scheme and Powerline status line.
 
@@ -34,15 +36,21 @@ dotfiles/
 │   ├── i3/
 │   │   └── config                     # Main i3wm configuration (Nord theme, gaps, keybindings)
 │   ├── picom/
-│   │   └── picom.conf                 # GLX compositor, blur, shadows, rounded corners
+│   │   └── picom.conf                 # GLX compositor, dual-kawase blur, shadows, rounded corners
 │   └── polybar/
-│       ├── config.ini                 # Dual Polybar configuration (main bar + apps dock)
-│       ├── launch.sh                  # Multi-instance supervisor (apps + main)
+│       ├── config.ini                 # Tri-bar Polybar configuration (apps, main, right)
+│       ├── current_theme.ini          # Active theme symlink (default: themes/default.ini)
+│       ├── themes/                    # Modular color palettes
+│       │   ├── default.ini            # Semi-transparent Nord theme
+│       │   ├── dracula.ini            # Dracula palette
+│       │   └── catppuccin-mocha.ini   # Catppuccin Mocha palette
+│       ├── set-theme.sh               # CLI theme switcher tool with live reload
+│       ├── launch.sh                  # Multi-instance daemon launcher (apps + main + right)
 │       ├── apps.json                  # Pinned apps configuration
 │       ├── apps_dock.py               # Clickable Nerd Font app launcher module
 │       ├── apps_settings.py           # GTK3 Nord-themed Apps Dock GUI manager
 │       ├── player.sh                  # MPRIS media player controller (playerctl)
-│       ├── bluetooth.sh               # Bluetooth status & quick control
+│       ├── bluetooth.sh               # Bluetooth status & quick control with Nerd Font icons
 │       ├── torrent.sh                 # Transmission daemon status & transfer speeds
 │       └── antivirus.py               # Google Antigravity quota visual meter & notifications
 ├── home/                               # Dotfiles placed directly in $HOME
@@ -58,61 +66,55 @@ dotfiles/
 
 ## 🚀 Quick Start
 
-### 1. Check Symlink Status
-Inspect which configurations are currently linked or unmanaged:
+### Installation & Symlink Creation
+```bash
+./install.sh
+```
+
+### Checking Symlink Status
 ```bash
 ./install.sh --status
 ```
 
-### 2. Verify Dependencies
-Check what core and optional packages are installed on your system:
-```bash
-./install.sh --check-deps
-```
-
-### 3. Dry Run
-Preview all backup and symlinking operations before making any changes:
-```bash
-./install.sh --dry-run
-```
-
-### 4. Install & Link
-Consolidate and softlink all configurations into `~/.config`, `~/.local/bin`, and `~`:
-```bash
-./install.sh
-```
-> **Note**: Any existing non-symlink configuration files are automatically backed up to `~/.dotfiles_backup/<timestamp>/` before creating the symlinks.
-
-### 5. Reload Running Environment
-Reload i3wm, Polybar, Picom, and Dunst in-place:
+### In-Place Hot Reloading
 ```bash
 ./install.sh --reload
 ```
 
+### Switching Polybar Color Themes
+```bash
+# List available themes
+~/.config/polybar/set-theme.sh --list
+
+# Switch to Dracula or Catppuccin Mocha with live reload
+~/.config/polybar/set-theme.sh dracula
+~/.config/polybar/set-theme.sh catppuccin-mocha
+
+# Return to default
+~/.config/polybar/set-theme.sh default
+```
+
 ---
 
-## ⚙️ Component Details
+## 💡 Key Features & Custom Modules
 
-### i3 Window Manager (`config/i3/config`)
-- **Modifier Key**: `Mod4` (Super / Windows key).
-- **Font**: JetBrains Mono 9.
-- **Gaps**: Inner 10px, Outer 2px, Top 46px (leaves space for Polybar).
-- **Palette**: Nord Dark (`#2e3440`, `#3b4252`, `#4c566a`, `#88c0d0`, `#bf616a`).
-- **Autostart Daemons**:
-  - `picom --config ~/.config/picom/picom.conf -b`
-  - `dunst`
-  - `~/.config/polybar/launch.sh`
-  - `~/.local/bin/i3-single-center.py`
-  - `~/.local/bin/wallpaper_rotator.py`
+### Apps Dock (`bar/apps`)
+- Located on the left flank at $x = 86\text{px}$ ($2.5\%$ screen offset).
+- Renders clickable application icons defined in `config/polybar/apps.json`.
+- Right-click anywhere on the dock or click the settings gear (󰒓) to launch the GTK3 Apps Manager.
 
-### Polybar (`config/polybar/`)
-- **Width**: 50% centered (`offset-x = 25%`) with 12px pill radius.
-- **Modules**:
-  - **Left**: `xworkspaces`, `xwindow`.
-  - **Right**: `mpris`, `wallpaper`, `antivirus` (Antigravity quota), `filesystem`, `pulseaudio`, `bluetooth`, `wifi`, `memory`, `cpu`, `date`.
-- **Antivirus (Antigravity Quota)**:
-  - Left-click: Pops up a desktop notification with remaining 5h and weekly quota.
-  - Right-click: Forces quota cache refresh.
+### Main Bar (`bar/main`)
+- Centered directly over the Center Master window ($50\%$ screen width).
+- Workspaces, active window title, MPRIS controls, wallpaper rotator, Antigravity quota meter, volume, and clock.
+
+### System HUD (`bar/right`)
+- Symmetrically balances the left apps dock on the right flank at $x = 2666\text{px}$ ($77.5\%$ screen offset, $20\%$ width).
+- Monitors hardware and connectivity with clean Nerd Font icons:
+  - 󰂱 / 󰂯 Bluetooth status (click opens Blueman, right-click toggles power)
+  - 󰖩 WiFi network SSID
+  - 󰋊 Root filesystem usage percentage
+  - 󰍛 Memory / RAM usage percentage
+  - 󰻠 CPU load percentage
 
 ### Ultrawide Centered Master Layout (`bin/i3-single-center.py`)
 - Continuously listens on the i3 IPC UNIX socket for `workspace` and `window` events.
